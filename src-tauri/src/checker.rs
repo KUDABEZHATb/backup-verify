@@ -115,8 +115,7 @@ pub fn check_folder_backup(conn: &Connection, backup: &BackupTarget) -> CheckRun
     // checked every run and the rest never — full coverage over time is the
     // property we actually want, not just "some sampling happened".
     let sample_target = ((known.len() as f64 * SAMPLE_FRACTION).ceil() as usize)
-        .max(SAMPLE_MIN)
-        .min(SAMPLE_MAX)
+        .clamp(SAMPLE_MIN, SAMPLE_MAX)
         .min(known.len());
     let due_for_resample: HashSet<String> = db::least_recently_seen_paths(conn, &backup.id, sample_target as i64)
         .unwrap_or_default()
