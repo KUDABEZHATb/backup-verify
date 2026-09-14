@@ -84,7 +84,7 @@ export default function App() {
         />
       )}
       {licenseOpen && (
-        <LicenseDialog onClose={() => setLicenseOpen(false)} onActivated={setLicense} />
+        <LicenseDialog current={license} onClose={() => setLicenseOpen(false)} onActivated={setLicense} />
       )}
     </div>
   );
