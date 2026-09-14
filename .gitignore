@@ -1,0 +1,17 @@
+# frontend
+node_modules
+dist
+
+# rust
+/src-tauri/target
+/keygen/target
+
+# the author's licensing secret — never, ever commit this
+/keygen/signing-key.secret
+
+# tauri gen
+/src-tauri/gen
+
+# editors / OS
+.DS_Store
+*.log
