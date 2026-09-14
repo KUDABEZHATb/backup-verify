@@ -98,6 +98,61 @@ body {
 }
 .license-info > div { display: flex; flex-direction: column; gap: 3px; }
 
+.modal.upsell { gap: 10px; }
+
+.upsell-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.upsell-features li {
+  font-size: 0.86rem;
+  padding-left: 1.4em;
+  position: relative;
+}
+.upsell-features li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.upsell-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+}
+.upsell-price { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.upsell-price-note { font-size: 0.8rem; color: var(--text-dim); }
+
+.btn-buy { padding: 0.75em 1em; font-size: 0.95rem; }
+
+.upsell-hint { margin: 0; font-size: 0.76rem; color: var(--text-dim); text-align: center; }
+
+.upsell-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+.upsell-divider::before, .upsell-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.upsell-have-key { align-self: center; font-size: 0.84rem; }
+
+.modal-actions-end { justify-content: center; margin-top: 0; }
+
 .app-main { flex: 1; overflow-y: auto; padding: 20px 24px 40px; }
 
 .loading { color: var(--text-dim); }
