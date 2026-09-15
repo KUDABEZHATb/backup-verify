@@ -30,9 +30,7 @@ pub fn activate_license(db: State<Db>, key: String) -> Result<LicenseInfo, Strin
 #[tauri::command]
 pub fn get_license_status(db: State<Db>) -> Result<Option<LicenseInfo>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    Ok(db::get_license(&conn)
-        .map_err(|e| e.to_string())?
-        .map(|(license_ref, tier)| LicenseInfo { tier, license_ref }))
+    db::get_license(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
