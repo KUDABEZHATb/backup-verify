@@ -14,9 +14,8 @@ and why.
 ## Status
 
 MVP: folder-based backups only (no restic/borg repo support yet — see
-`docs/architecture.md`), offline license-key gating (see
-`docs/licensing.md`), not yet code-signed or publicly distributed (see
-`docs/distribution.md` for the launch checklist).
+`docs/architecture.md`), offline license-key gating, not yet code-signed
+or publicly distributed.
 
 ## Developing
 
@@ -38,12 +37,3 @@ Cross-platform release builds run in CI on tagged pushes — see
 `.github/workflows/release.yml`. There is no reliable way to build a real
 macOS `.dmg` from Linux, so local development on Linux is fine but the
 actual Windows/macOS installers come from CI or a machine running that OS.
-
-## Issuing a license key after a sale
-
-```
-cd keygen
-./target/release/license-keygen issue --email customer@example.com
-```
-
-See `docs/licensing.md` for the full scheme and its tradeoffs.
