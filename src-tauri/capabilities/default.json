@@ -11,6 +11,10 @@
     "opener:default",
     "notification:default",
     "dialog:default",
-    "autostart:default"
+    "autostart:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://api.github.com/repos/KUDABEZHATb/backup-verify/releases/latest" }]
+    }
   ]
 }

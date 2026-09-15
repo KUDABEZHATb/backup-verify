@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { BackupTarget, CheckRun, LicenseInfo, NewBackup } from "./types";
+import type { BackupTarget, CheckRun, LicenseInfo, NewBackup, UpdateInfo } from "./types";
 
 export const api = {
   listBackups: () => invoke<BackupTarget[]>("list_backups"),
@@ -9,4 +9,5 @@ export const api = {
   runCheckNow: (id: string) => invoke<BackupTarget>("run_check_now", { id }),
   activateLicense: (key: string) => invoke<LicenseInfo>("activate_license", { key }),
   getLicenseStatus: () => invoke<LicenseInfo | null>("get_license_status"),
+  checkForUpdate: () => invoke<UpdateInfo>("check_for_update"),
 };

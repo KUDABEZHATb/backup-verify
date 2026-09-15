@@ -1,11 +1,12 @@
 name: release
 
-# Builds real Windows and macOS installers on Microsoft's and Apple's own
-# runners — this is the standard, correct way to cross-build a Tauri app;
-# there is no reliable way to produce a working macOS .dmg from Linux.
+# Windows-only for now: no macOS to test a build on by hand, and shipping an
+# untested build to a paying customer risks a refund with no easy way to
+# diagnose or fix it. Re-add a macos-latest matrix entry (see git history
+# for the last working version) once real testing on a Mac is possible.
 # Push a tag like v0.1.0 to trigger a build; it lands in a draft GitHub
-# Release with unsigned installers attached until the signing secrets below
-# are added (see docs/distribution.md).
+# Release with an unsigned installer attached until the signing secret
+# below is added (see docs/distribution.md).
 
 on:
   push:
@@ -15,15 +16,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-          - platform: macos-latest
-            args: "--target universal-apple-darwin"
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -32,8 +25,6 @@ jobs:
           node-version: 22
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Install frontend dependencies
         run: npm ci
@@ -41,14 +32,6 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS notarization — set these repo secrets once an Apple
-          # Developer Program account exists (docs/distribution.md).
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # Windows code signing — set once a code-signing certificate
           # exists (docs/distribution.md); build still succeeds without it,
           # installers just trigger a SmartScreen warning until then.
@@ -59,4 +42,3 @@ jobs:
           releaseName: "Backup Verify ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}

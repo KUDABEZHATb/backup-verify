@@ -31,6 +31,13 @@ export interface LicenseInfo {
   license_ref: string;
 }
 
+export interface UpdateInfo {
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+  release_url: string;
+}
+
 export interface NewBackup {
   name: string;
   path: string;
