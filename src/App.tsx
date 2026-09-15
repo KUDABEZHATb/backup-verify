@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import type { BackupTarget, LicenseInfo } from "./types";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import type { BackupTarget, LicenseInfo, UpdateInfo } from "./types";
 import { api } from "./api";
 import { BackupCard } from "./components/BackupCard";
 import { AddBackupDialog } from "./components/AddBackupDialog";
@@ -13,6 +14,8 @@ export default function App() {
   const [license, setLicense] = useState<LicenseInfo | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [licenseOpen, setLicenseOpen] = useState(false);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   useEffect(() => {
     api.listBackups().then(setBackups);
@@ -48,11 +51,36 @@ export default function App() {
     setLicenseOpen(true);
   }
 
+  async function handleCheckUpdate() {
+    setCheckingUpdate(true);
+    try {
+      const info = await api.checkForUpdate();
+      setUpdate(info);
+    } catch {
+      setUpdate(null);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>Проверка бэкапов</h1>
         <div className="app-header-actions">
+          {update?.update_available ? (
+            <button className="btn btn-ghost" onClick={() => openUrl(update.release_url)}>
+              Доступна версия {update.latest_version} →
+            </button>
+          ) : (
+            <button className="btn btn-ghost" onClick={handleCheckUpdate} disabled={checkingUpdate}>
+              {checkingUpdate
+                ? "Проверка…"
+                : update
+                  ? "Обновлений нет"
+                  : "Проверить обновления"}
+            </button>
+          )}
           <button className="license-badge" onClick={() => setLicenseOpen(true)}>
             {license ? `PRO · ${license.license_ref}` : "Бесплатная версия"}
           </button>

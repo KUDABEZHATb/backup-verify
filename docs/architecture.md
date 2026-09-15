@@ -66,6 +66,17 @@ async runtime the UI and tray icon depend on. Closing the window hides it
 (`lib.rs`'s `on_window_event`) rather than quitting — the point of the app
 is the background schedule, not the window.
 
+## Checking for a new version
+
+The one deliberate exception to "no network" above: a "Проверить обновления"
+button in the header calls `check_for_update` (`src-tauri/src/update_check.rs`),
+which fetches `GET api.github.com/repos/KUDABEZHATb/backup-verify/releases/latest`
+via `tauri-plugin-http` (scoped in `capabilities/default.json` to that one URL)
+and compares the release tag to `CARGO_PKG_VERSION`. It never runs on its own
+— no request happens unless the user clicks the button — and it never
+downloads or installs anything; a newer version just turns the button into a
+link to the GitHub release page.
+
 ## Data storage
 
 A single local SQLite database (`rusqlite`, bundled — no system SQLite
