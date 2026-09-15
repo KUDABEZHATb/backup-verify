@@ -1,3 +1,4 @@
+mod activation;
 mod checker;
 mod commands;
 mod db;

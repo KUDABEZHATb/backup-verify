@@ -43,7 +43,7 @@ export function BackupCard({ backup, onChanged, onRemoved }: Props) {
   }
 
   return (
-    <div className={`backup-card status-border-${backup.last_status}`}>
+    <div className={`backup-card status-border-${backup.last_status}${backup.locked ? " backup-card-locked" : ""}`}>
       <div className="backup-card-head">
         <div className="backup-card-titles">
           <h3>{backup.name}</h3>
@@ -51,10 +51,16 @@ export function BackupCard({ backup, onChanged, onRemoved }: Props) {
             {backup.path}
           </span>
         </div>
-        <StatusPill status={backup.last_status} />
+        {backup.locked ? <span className="locked-pill">Заблокировано лицензией</span> : <StatusPill status={backup.last_status} />}
       </div>
 
-      {backup.last_message && <p className="backup-message">{backup.last_message}</p>}
+      {backup.locked && (
+        <p className="backup-message">
+          Этот бэкап превышает лимит текущей лицензии и не проверяется. Активируйте лицензию с бóльшим лимитом или
+          уберите лишние бэкапы.
+        </p>
+      )}
+      {!backup.locked && backup.last_message && <p className="backup-message">{backup.last_message}</p>}
 
       <div className="backup-meta">
         <div>
@@ -72,7 +78,7 @@ export function BackupCard({ backup, onChanged, onRemoved }: Props) {
       </div>
 
       <div className="backup-card-actions">
-        <button onClick={checkNow} disabled={checking} className="btn btn-primary">
+        <button onClick={checkNow} disabled={checking || backup.locked} className="btn btn-primary">
           {checking ? "Проверяю…" : "Проверить сейчас"}
         </button>
         <button onClick={toggleHistory} className="btn btn-ghost">

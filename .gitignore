@@ -4,21 +4,16 @@ dist
 
 # rust
 /src-tauri/target
-/keygen/target
-
-# the author's licensing secret — never, ever commit this
-/keygen/signing-key.secret
 
 # business/pricing strategy — local only, not for a repo anyone but the
 # author can ever see (public or not: git history doesn't forget)
 /docs/distribution.md
 
-# licensing scheme write-up and the key-minting tool itself — end users of
-# the program never need either, and keeping them out of the repo means
-# reading it doesn't hand anyone a documented shortcut to a working keygen
-# (the actual secret was already moved out of tracked source, see build.rs)
+# licensing scheme write-up — end users of the program never need it, and
+# it documents the license server's protocol in more detail than there's
+# any reason to expose (the server itself, with the actual signing key,
+# lives outside this repo entirely — see docs/licensing.md)
 /docs/licensing.md
-/keygen/
 
 # tauri gen
 /src-tauri/gen
