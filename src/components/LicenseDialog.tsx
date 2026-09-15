@@ -45,11 +45,21 @@ function LicenseInfoView({
           <span className="meta-value">PRO</span>
         </div>
         <div>
-          <span className="meta-label">Референс ключа</span>
+          <span className="meta-label">Ключ</span>
           <span className="meta-value">{current.license_ref}</span>
         </div>
+        <div>
+          <span className="meta-label">Лимит бэкапов</span>
+          <span className="meta-value">{current.max_backups}</span>
+        </div>
+        <div>
+          <span className="meta-label">Действует до</span>
+          <span className="meta-value">{new Date(current.expires_at).toLocaleDateString()}</span>
+        </div>
       </div>
-      <p className="modal-hint">Ограничение на количество бэкапов снято.</p>
+      <p className="modal-hint">
+        Приложение само продлевает лицензию в фоне, пока есть подключение к интернету хотя бы изредка.
+      </p>
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={onEditRequested}>
           Ввести другой ключ
@@ -96,7 +106,7 @@ function UpsellPanel({ onClose, onHaveKey }: { onClose: () => void; onHaveKey: (
       <ul className="upsell-features">
         <li>Неограниченное число отслеживаемых бэкапов</li>
         <li>Один платёж, без подписки и повторных списаний</li>
-        <li>Ключ работает офлайн — без привязки к аккаунту</li>
+        <li>Активация онлайн один раз, дальше приложение само продлевает лицензию в фоне</li>
       </ul>
       <div className="upsell-price-row">
         <span className="upsell-price">{PRICE_LABEL}</span>
@@ -157,7 +167,7 @@ function KeyEntryPanel({
         <input
           value={key}
           onChange={(e) => setKey(e.target.value)}
-          placeholder="BVPR-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXX"
+          placeholder="BVPR-XXXXX-XXXXX-XXXXX-XXXXX"
           autoFocus
         />
       </label>

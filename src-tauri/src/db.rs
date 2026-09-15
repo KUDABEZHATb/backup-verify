@@ -57,10 +57,19 @@ pub fn open(app_handle: &tauri::AppHandle) -> Db {
 
         CREATE TABLE IF NOT EXISTS license (
             id              INTEGER PRIMARY KEY CHECK (id = 1),
-            raw_key         TEXT NOT NULL,
-            license_ref     TEXT NOT NULL,
-            tier            TEXT NOT NULL,
+            receipt         TEXT NOT NULL,
+            signature       TEXT NOT NULL,
             activated_at    TEXT NOT NULL
+        );
+
+        -- A stable per-install id sent to the license server on activation
+        -- and revalidation. Generated once and kept regardless of whether
+        -- a license is currently active, so re-activating the same install
+        -- doesn't silently count as a second device against the key's
+        -- activation limit.
+        CREATE TABLE IF NOT EXISTS device (
+            id          INTEGER PRIMARY KEY CHECK (id = 1),
+            machine_id  TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS file_hashes (
@@ -88,6 +97,7 @@ fn row_to_backup(row: &rusqlite::Row) -> rusqlite::Result<BackupTarget> {
         last_check_at: row.get(5)?,
         last_status: CheckStatus::from_str(&row.get::<_, String>(6)?),
         last_message: row.get(7)?,
+        locked: false, // filled in by commands::list_backups, which knows the current quota
     })
 }
 
@@ -108,6 +118,7 @@ pub fn insert_backup(conn: &Connection, new: &NewBackup) -> rusqlite::Result<Bac
         last_check_at: None,
         last_status: CheckStatus::Pending,
         last_message: None,
+        locked: false, // it was just accepted by add_backup's own quota check
     })
 }
 
@@ -115,29 +126,77 @@ pub fn backup_count(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row("SELECT COUNT(*) FROM backups", [], |row| row.get(0))
 }
 
-pub fn save_license(conn: &Connection, raw_key: &str, license_ref: &str, tier: &str) -> rusqlite::Result<()> {
+/// This install's stable id, generated once on first use and kept from
+/// then on — sent to the license server so it can tell "the same install
+/// re-activating" from "a new device," and enforce its per-key limit.
+pub fn machine_id(conn: &Connection) -> rusqlite::Result<String> {
+    let existing: Option<String> = conn
+        .query_row("SELECT machine_id FROM device WHERE id = 1", [], |row| row.get(0))
+        .optional()?;
+    if let Some(id) = existing {
+        return Ok(id);
+    }
+    let id = Uuid::new_v4().to_string();
+    conn.execute("INSERT INTO device (id, machine_id) VALUES (1, ?1)", params![id])?;
+    Ok(id)
+}
+
+pub fn save_receipt(conn: &Connection, receipt_b64: &str, signature_b64: &str) -> rusqlite::Result<()> {
     conn.execute(
-        "INSERT INTO license (id, raw_key, license_ref, tier, activated_at) VALUES (1, ?1, ?2, ?3, ?4)
-         ON CONFLICT(id) DO UPDATE SET raw_key = excluded.raw_key, license_ref = excluded.license_ref,
-            tier = excluded.tier, activated_at = excluded.activated_at",
-        params![raw_key, license_ref, tier, Utc::now().to_rfc3339()],
+        "INSERT INTO license (id, receipt, signature, activated_at) VALUES (1, ?1, ?2, ?3)
+         ON CONFLICT(id) DO UPDATE SET receipt = excluded.receipt, signature = excluded.signature,
+            activated_at = excluded.activated_at",
+        params![receipt_b64, signature_b64, Utc::now().to_rfc3339()],
     )?;
     Ok(())
 }
 
-/// Re-verifies the stored key against `license::verify_key` on every call
-/// instead of trusting the row's mere existence (or its stored `tier`/
-/// `license_ref` columns, which are convenience copies, not the source of
-/// truth). Trusting existence alone meant anyone could open the SQLite file
-/// in a free DB browser, insert one row with any `raw_key` value, and pass
-/// as licensed forever — no crypto knowledge, no reverse-engineering,
-/// easier than casual key sharing was ever meant to be. A tampered or
-/// stale row now just fails verification and falls back to unlicensed.
+fn stored_receipt(conn: &Connection) -> rusqlite::Result<Option<(String, String)>> {
+    conn.query_row("SELECT receipt, signature FROM license WHERE id = 1", [], |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })
+    .optional()
+}
+
+/// Re-verifies the stored receipt's signature and expiry on every call
+/// instead of trusting the row's mere existence. The old scheme trusted
+/// existence alone, so anyone could open the SQLite file in a free DB
+/// browser, insert one row, and pass as licensed forever — no crypto
+/// knowledge, no reverse-engineering. A tampered, forged, or expired row
+/// now just fails verification and falls back to unlicensed.
 pub fn get_license(conn: &Connection) -> rusqlite::Result<Option<crate::license::LicenseInfo>> {
-    let raw_key: Option<String> = conn
-        .query_row("SELECT raw_key FROM license WHERE id = 1", [], |row| row.get(0))
-        .optional()?;
-    Ok(raw_key.and_then(|k| crate::license::verify_key(&k).ok()))
+    let stored = stored_receipt(conn)?;
+    Ok(stored.and_then(|(r, s)| crate::license::status_from_stored(&r, &s)))
+}
+
+/// The key + machine_id from the stored receipt, if its signature is
+/// genuine — used to ask the server for a fresh receipt. Unlike
+/// `get_license`, this doesn't care whether the receipt has expired: an
+/// expired-but-genuine receipt is exactly the case revalidation exists for.
+pub fn receipt_for_revalidation(conn: &Connection) -> rusqlite::Result<Option<(String, String)>> {
+    let stored = stored_receipt(conn)?;
+    Ok(stored
+        .and_then(|(r, s)| crate::license::verify_receipt(&r, &s).ok())
+        .map(|receipt| (receipt.key, receipt.machine_id)))
+}
+
+/// How many backups this install is currently entitled to actively use —
+/// the free-tier limit, or whatever a currently-valid receipt grants.
+pub fn current_max_backups(conn: &Connection) -> rusqlite::Result<i64> {
+    Ok(get_license(conn)?.map(|l| l.max_backups).unwrap_or(crate::license::FREE_TIER_BACKUP_LIMIT))
+}
+
+/// The ids of the backups this install is actually entitled to have the
+/// app act on: the first `max_backups` by creation order. Enforcement is
+/// re-derived from this on every read (list/schedule/check), not just once
+/// when a backup is added — so a row inserted directly into `backups`
+/// behind the app's back (bypassing add_backup's own count check) doesn't
+/// grant a working extra backup, just an inert row the app never checks.
+pub fn entitled_backup_ids(conn: &Connection, max_backups: i64) -> rusqlite::Result<Vec<String>> {
+    let limit = max_backups.max(0);
+    let mut stmt = conn.prepare("SELECT id FROM backups ORDER BY created_at ASC LIMIT ?1")?;
+    let rows = stmt.query_map(params![limit], |row| row.get(0))?;
+    rows.collect()
 }
 
 pub fn list_backups(conn: &Connection) -> rusqlite::Result<Vec<BackupTarget>> {
@@ -315,10 +374,12 @@ mod tests {
         conn.execute_batch(
             "CREATE TABLE license (
                 id           INTEGER PRIMARY KEY CHECK (id = 1),
-                raw_key      TEXT NOT NULL,
-                license_ref  TEXT NOT NULL,
-                tier         TEXT NOT NULL,
+                receipt      TEXT NOT NULL,
+                signature    TEXT NOT NULL,
                 activated_at TEXT NOT NULL
+            );
+            CREATE TABLE backups (
+                id TEXT PRIMARY KEY, created_at TEXT NOT NULL
             );",
         )
         .unwrap();
@@ -329,19 +390,20 @@ mod tests {
     fn no_row_means_unlicensed() {
         let conn = license_only_conn();
         assert!(get_license(&conn).unwrap().is_none());
+        assert_eq!(current_max_backups(&conn).unwrap(), crate::license::FREE_TIER_BACKUP_LIMIT);
     }
 
     #[test]
-    fn a_row_with_a_garbage_key_does_not_count_as_licensed() {
+    fn a_row_with_a_garbage_receipt_does_not_count_as_licensed() {
         // Regression test: a row used to grant a license just by existing,
-        // regardless of whether raw_key was ever a real key — anyone could
-        // open the SQLite file in a free DB browser and insert one to get
-        // unlimited backups for free. get_license must re-verify raw_key,
-        // not just check that a row is there.
+        // regardless of whether the stored value was ever real — anyone
+        // could open the SQLite file in a free DB browser and insert one to
+        // get unlimited backups for free. get_license must re-verify the
+        // receipt's signature, not just check that a row is there.
         let conn = license_only_conn();
         conn.execute(
-            "INSERT INTO license (id, raw_key, license_ref, tier, activated_at)
-             VALUES (1, 'not-a-real-key', 'FAKE', 'pro', '2024-01-01')",
+            "INSERT INTO license (id, receipt, signature, activated_at)
+             VALUES (1, 'not-a-real-receipt', 'not-a-real-signature', '2024-01-01')",
             [],
         )
         .unwrap();
@@ -349,16 +411,30 @@ mod tests {
     }
 
     #[test]
-    fn a_row_with_a_genuine_key_counts_as_licensed() {
+    fn entitled_backup_ids_returns_only_the_first_n_by_creation_order() {
         let conn = license_only_conn();
-        let key = "BVPR-A35GQ-6WG9K-B1BPW-NZZQ6-FMFXY-QR0";
-        let info = crate::license::verify_key(key).unwrap();
+        for (id, created_at) in [("a", "2024-01-01"), ("b", "2024-01-02"), ("c", "2024-01-03")] {
+            conn.execute(
+                "INSERT INTO backups (id, created_at) VALUES (?1, ?2)",
+                params![id, created_at],
+            )
+            .unwrap();
+        }
+        assert_eq!(entitled_backup_ids(&conn, 2).unwrap(), vec!["a", "b"]);
+        assert_eq!(entitled_backup_ids(&conn, 0).unwrap(), Vec::<String>::new());
+        assert_eq!(entitled_backup_ids(&conn, 99).unwrap(), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn machine_id_is_generated_once_and_kept() {
+        let conn = license_only_conn();
         conn.execute(
-            "INSERT INTO license (id, raw_key, license_ref, tier, activated_at)
-             VALUES (1, ?1, ?2, ?3, '2024-01-01')",
-            params![key, info.license_ref, info.tier],
+            "CREATE TABLE device (id INTEGER PRIMARY KEY CHECK (id = 1), machine_id TEXT NOT NULL)",
+            [],
         )
         .unwrap();
-        assert!(get_license(&conn).unwrap().is_some());
+        let first = machine_id(&conn).unwrap();
+        let second = machine_id(&conn).unwrap();
+        assert_eq!(first, second);
     }
 }

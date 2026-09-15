@@ -78,6 +78,13 @@ pub struct BackupTarget {
     pub last_check_at: Option<String>,
     pub last_status: CheckStatus,
     pub last_message: Option<String>,
+    /// True if this backup is beyond the install's current license quota —
+    /// set by `commands::list_backups`, not stored in the database. The
+    /// scheduler and manual checks both refuse to act on a locked backup,
+    /// so a row that ends up here some other way than `add_backup` (e.g.
+    /// inserted directly into the database) is inert, not a working extra
+    /// backup.
+    pub locked: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

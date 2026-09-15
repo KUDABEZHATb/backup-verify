@@ -10,6 +10,11 @@ export interface BackupTarget {
   last_check_at: string | null;
   last_status: CheckStatus;
   last_message: string | null;
+  // True if this backup is beyond the current license quota — the
+  // scheduler and manual checks both skip it until a license with room
+  // for it is activated (or, for the free tier, until an extra one is
+  // removed).
+  locked: boolean;
 }
 
 export interface CheckRun {
@@ -29,6 +34,8 @@ export interface CheckRun {
 export interface LicenseInfo {
   tier: string;
   license_ref: string;
+  max_backups: number;
+  expires_at: string;
 }
 
 export interface UpdateInfo {

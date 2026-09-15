@@ -214,6 +214,17 @@ body {
 .status-pill.status-error { color: var(--err); background: var(--err-bg); }
 .status-pill.status-pending { color: var(--pending); background: var(--pending-bg); }
 
+.backup-card-locked { opacity: 0.7; }
+.locked-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--err);
+  background: var(--err-bg);
+}
+
 .btn {
   font: inherit;
   font-weight: 600;
