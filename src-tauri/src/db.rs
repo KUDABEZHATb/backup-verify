@@ -125,11 +125,19 @@ pub fn save_license(conn: &Connection, raw_key: &str, license_ref: &str, tier: &
     Ok(())
 }
 
-pub fn get_license(conn: &Connection) -> rusqlite::Result<Option<(String, String)>> {
-    conn.query_row("SELECT license_ref, tier FROM license WHERE id = 1", [], |row| {
-        Ok((row.get(0)?, row.get(1)?))
-    })
-    .optional()
+/// Re-verifies the stored key against `license::verify_key` on every call
+/// instead of trusting the row's mere existence (or its stored `tier`/
+/// `license_ref` columns, which are convenience copies, not the source of
+/// truth). Trusting existence alone meant anyone could open the SQLite file
+/// in a free DB browser, insert one row with any `raw_key` value, and pass
+/// as licensed forever — no crypto knowledge, no reverse-engineering,
+/// easier than casual key sharing was ever meant to be. A tampered or
+/// stale row now just fails verification and falls back to unlicensed.
+pub fn get_license(conn: &Connection) -> rusqlite::Result<Option<crate::license::LicenseInfo>> {
+    let raw_key: Option<String> = conn
+        .query_row("SELECT raw_key FROM license WHERE id = 1", [], |row| row.get(0))
+        .optional()?;
+    Ok(raw_key.and_then(|k| crate::license::verify_key(&k).ok()))
 }
 
 pub fn list_backups(conn: &Connection) -> rusqlite::Result<Vec<BackupTarget>> {
@@ -296,4 +304,61 @@ pub fn least_recently_seen_paths(
     )?;
     let rows = stmt.query_map(params![backup_id, limit], |row| row.get(0))?;
     rows.collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn license_only_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE license (
+                id           INTEGER PRIMARY KEY CHECK (id = 1),
+                raw_key      TEXT NOT NULL,
+                license_ref  TEXT NOT NULL,
+                tier         TEXT NOT NULL,
+                activated_at TEXT NOT NULL
+            );",
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn no_row_means_unlicensed() {
+        let conn = license_only_conn();
+        assert!(get_license(&conn).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_row_with_a_garbage_key_does_not_count_as_licensed() {
+        // Regression test: a row used to grant a license just by existing,
+        // regardless of whether raw_key was ever a real key — anyone could
+        // open the SQLite file in a free DB browser and insert one to get
+        // unlimited backups for free. get_license must re-verify raw_key,
+        // not just check that a row is there.
+        let conn = license_only_conn();
+        conn.execute(
+            "INSERT INTO license (id, raw_key, license_ref, tier, activated_at)
+             VALUES (1, 'not-a-real-key', 'FAKE', 'pro', '2024-01-01')",
+            [],
+        )
+        .unwrap();
+        assert!(get_license(&conn).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_row_with_a_genuine_key_counts_as_licensed() {
+        let conn = license_only_conn();
+        let key = "BVPR-A35GQ-6WG9K-B1BPW-NZZQ6-FMFXY-QR0";
+        let info = crate::license::verify_key(key).unwrap();
+        conn.execute(
+            "INSERT INTO license (id, raw_key, license_ref, tier, activated_at)
+             VALUES (1, ?1, ?2, ?3, '2024-01-01')",
+            params![key, info.license_ref, info.tier],
+        )
+        .unwrap();
+        assert!(get_license(&conn).unwrap().is_some());
+    }
 }
