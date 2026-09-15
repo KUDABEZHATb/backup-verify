@@ -13,6 +13,13 @@ dist
 # author can ever see (public or not: git history doesn't forget)
 /docs/distribution.md
 
+# licensing scheme write-up and the key-minting tool itself — end users of
+# the program never need either, and keeping them out of the repo means
+# reading it doesn't hand anyone a documented shortcut to a working keygen
+# (the actual secret was already moved out of tracked source, see build.rs)
+/docs/licensing.md
+/keygen/
+
 # tauri gen
 /src-tauri/gen
 

@@ -10,6 +10,11 @@
 //! low-priced utility app — it stops casual key sharing, not a determined
 //! attacker. See docs/licensing.md before raising the price point or
 //! adding a tier where that tradeoff stops being acceptable.
+//!
+//! `SHARED_SECRET` itself is not written here — `build.rs` bakes it in at
+//! compile time (from `BVPR_SIGNING_SECRET` in CI, or the gitignored
+//! `keygen/signing-key.secret` locally) so it never sits in tracked source
+//! where anyone with repo read access could just read it off GitHub.
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
@@ -17,11 +22,7 @@ use subtle::ConstantTimeEq;
 
 type HmacSha256 = Hmac<Sha256>;
 
-// Generated once via `license-keygen genkey`, must match the keygen tool's
-// signing-key.secret exactly.
-const SHARED_SECRET: [u8; 32] = [
-    ***REMOVED (rotated dead secret, redacted from history)***
-];
+include!(concat!(env!("OUT_DIR"), "/signing_secret.rs"));
 
 const MAC_LEN: usize = 10;
 
@@ -78,15 +79,16 @@ mod tests {
 
     #[test]
     fn accepts_a_key_from_the_real_keygen_tool() {
-        // Minted with the SHARED_SECRET above via `license-keygen issue`.
-        let key = "BVPR-A3ZMX-PT3M3-RE4RN-53TAA-3ZKWA-B9G";
+        // Minted via `license-keygen issue` against the secret baked in by
+        // build.rs — re-mint with the keygen tool if that secret rotates.
+        let key = "BVPR-A35GQ-6WG9K-B1BPW-NZZQ6-FMFXY-QR0";
         let info = verify_key(key).expect("valid key must verify");
         assert_eq!(info.tier, "pro");
     }
 
     #[test]
     fn rejects_a_tampered_key() {
-        let mut key = "BVPR-A3ZMX-PT3M3-RE4RN-53TAA-3ZKWA-B9G".to_string();
+        let mut key = "BVPR-A35GQ-6WG9K-B1BPW-NZZQ6-FMFXY-QR0".to_string();
         key.replace_range(6..7, "0");
         assert!(verify_key(&key).is_err());
     }
