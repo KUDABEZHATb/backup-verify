@@ -1,5 +1,6 @@
-// Placeholder until there's a real product page (see docs/distribution.md —
-// Lemonsqueezy/Gumroad signup is still pending compliance review). Swapping
-// this one constant is the entire change needed once that page exists.
+// Placeholder until the real ЮKassa payment link exists (see
+// docs/distribution.md — Lemonsqueezy/Gumroad/Paddle are blocked for a
+// Russian seller). Swapping this one constant is the entire change needed
+// once that link exists.
 export const PURCHASE_URL = "https://example.com/backup-verify-buy";
-export const PRICE_LABEL = "$19";
+export const PRICE_LABEL = "₽ 1490";
