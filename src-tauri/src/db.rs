@@ -24,6 +24,15 @@ pub fn open(app_handle: &tauri::AppHandle) -> Db {
     std::fs::create_dir_all(&dir).expect("failed to create app data dir");
     let db_path = dir.join("backup-verify.sqlite3");
     let conn = Connection::open(db_path).expect("failed to open sqlite database");
+
+    // Without this, a connection that can't immediately get the lock it
+    // needs (e.g. another connection mid-write) waits forever with no
+    // feedback to the UI — the command just never returns and the window
+    // shows "Загрузка…" indefinitely. 5s is long enough for any legitimate
+    // contention between the UI and the background scheduler, short enough
+    // that a real problem surfaces as a visible error instead of a hang.
+    conn.busy_timeout(std::time::Duration::from_secs(5)).expect("failed to set busy_timeout");
+
     conn.execute_batch(
         "
         PRAGMA journal_mode = WAL;
@@ -84,6 +93,16 @@ pub fn open(app_handle: &tauri::AppHandle) -> Db {
         ",
     )
     .expect("failed to init schema");
+
+    // Folds the WAL back into the main file on every startup instead of
+    // only whenever SQLite feels like it (default: every ~1000 pages).
+    // The app has repeatedly been force-killed during testing, leaving an
+    // ever-growing, never-checkpointed WAL that a later launch could get
+    // stuck reading — keeping it small on every clean start is cheap
+    // insurance against that happening again on a real machine (unclean
+    // shutdown, crash, power loss).
+    let _: rusqlite::Result<()> = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
+
     Db(Mutex::new(conn))
 }
 
