@@ -10,7 +10,9 @@
 
 use serde::Deserialize;
 
-pub const LICENSE_SERVER_URL: &str = "https://license.example.invalid:8766";
+// A path on our own domain rather than a host name, so the license server can
+// move between machines with a DNS change instead of an app update.
+pub const LICENSE_SERVER_URL: &str = "https://kopiya-verna.ru/license";
 
 pub struct StoredReceipt {
     pub receipt_b64: String,
