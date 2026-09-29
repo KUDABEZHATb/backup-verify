@@ -7,7 +7,6 @@ mod license;
 mod models;
 mod notify;
 mod scheduler;
-mod update_check;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -34,6 +33,7 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
             let db = db::open(&handle);
@@ -47,7 +47,7 @@ pub fn run() {
             let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Проверка бэкапов")
+                .tooltip("Копия верна")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -89,7 +89,6 @@ pub fn run() {
             commands::run_check_now,
             commands::activate_license,
             commands::get_license_status,
-            update_check::check_for_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

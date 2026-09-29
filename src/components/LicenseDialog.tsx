@@ -115,7 +115,7 @@ function UpsellPanel({ onClose, onHaveKey }: { onClose: () => void; onHaveKey: (
       <button type="button" className="btn btn-primary btn-buy" onClick={buy}>
         Купить ключ
       </button>
-      <p className="upsell-hint">Ключ придёт на почту сразу после оплаты — вставите его на следующем шаге.</p>
+      <p className="upsell-hint">Ключ появится на экране сразу после оплаты — вставите его на следующем шаге.</p>
       <div className="upsell-divider">
         <span>или</span>
       </div>
