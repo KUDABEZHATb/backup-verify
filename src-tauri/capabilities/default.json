@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-hide",
@@ -12,9 +14,6 @@
     "notification:default",
     "dialog:default",
     "autostart:default",
-    {
-      "identifier": "http:default",
-      "allow": [{ "url": "https://api.github.com/repos/KUDABEZHATb/backup-verify/releases/latest" }]
-    }
+    "updater:default"
   ]
 }
