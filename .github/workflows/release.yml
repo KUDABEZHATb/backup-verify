@@ -44,6 +44,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Backup Verify ${{ github.ref_name }}"
+          releaseName: "Копия верна ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
+          # GitHub strips non-ASCII from uploaded asset names, which turned
+          # «Копия верна_0.3.0_x64-setup.exe» into «_0.3.0_x64-setup.exe» and
+          # broke tauri-action's signature lookup, so no latest.json was
+          # uploaded and the in-app updater had nothing to fetch.
+          assetNamePattern: "kopiya-verna_[version]_[arch][setup][ext]"
+          # NSIS runs in the passive install mode the updater is set up for.
+          updaterJsonPreferNsis: true
