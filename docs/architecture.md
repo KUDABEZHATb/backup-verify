@@ -71,8 +71,8 @@ is the background schedule, not the window.
 The one deliberate exception to "no network" above: the "Проверить обновления"
 button in the header (`src/components/UpdateButton.tsx`) uses Tauri's updater
 plugin. It never runs on its own — no request happens unless the user clicks.
-A click fetches `latest.json` from the newest *published* GitHub release
-(drafts are invisible to it), and if a newer version exists the button turns
+A click fetches `https://kopiya-verna.ru/updates/latest.json` (since v0.3.2;
+before that it was GitHub's `releases/latest`), and if a newer version exists the button turns
 into "Обновить до X.Y.Z". A second click downloads the installer with a
 progress percentage, verifies its minisign signature against the public key
 pinned in `tauri.conf.json` (`plugins.updater.pubkey`), and runs it in
