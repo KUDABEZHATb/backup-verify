@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 
 // One button that walks through the whole update: check → offer → download
@@ -14,8 +14,35 @@ type State =
   | { kind: "installing" }
   | { kind: "error"; message: string };
 
+// The app lives in the tray and is usually started with Windows, so a check at
+// startup alone would only run once per reboot. The webview keeps running while
+// the window is hidden, hence a slow repeat: one tiny manifest request per day.
+const AUTO_CHECK_DELAY_MS = 15_000;
+const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 export function UpdateButton() {
   const [state, setState] = useState<State>({ kind: "idle" });
+
+  // Silent background check: only an available update changes the UI, "no
+  // update" and network errors stay invisible (the manual button reports them).
+  useEffect(() => {
+    async function autoCheck() {
+      try {
+        const update = await check();
+        if (update) {
+          setState((s) => (s.kind === "idle" || s.kind === "none" || s.kind === "error" ? { kind: "available", update } : s));
+        }
+      } catch {
+        // offline or server down — try again at the next tick
+      }
+    }
+    const first = setTimeout(autoCheck, AUTO_CHECK_DELAY_MS);
+    const repeat = setInterval(autoCheck, AUTO_CHECK_INTERVAL_MS);
+    return () => {
+      clearTimeout(first);
+      clearInterval(repeat);
+    };
+  }, []);
 
   async function checkForUpdate() {
     setState({ kind: "checking" });
